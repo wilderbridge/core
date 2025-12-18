@@ -904,8 +904,71 @@ async def test_entity_and_device_data(
 @pytest.mark.usefixtures("config_entry_setup")
 async def test_hub_not_client(hass: HomeAssistant) -> None:
     """Test that the cloud key doesn't become a switch."""
-    assert len(hass.states.async_entity_ids(SWITCH_DOMAIN)) == 0
-    assert hass.states.get("switch.cloud_key") is None
+    entities = hass.states.async_entity_ids(SWITCH_DOMAIN)
+    assert len(entities) == 1
+    assert "switch.cloud_key" not in entities
+    assert "switch.mock_name_locate" in entities
+
+
+@pytest.mark.parametrize("device_payload", [[DEVICE_1]])
+async def test_device_locate_switch(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    mock_websocket_message: WebsocketMessageMock,
+    config_entry_setup: MockConfigEntry,
+    device_payload: list[dict[str, Any]],
+) -> None:
+    """Test the locate switch for devices."""
+    entity_id = "switch.mock_name_locate"
+    assert hass.states.get(entity_id).state == STATE_OFF
+
+    aioclient_mock.clear_requests()
+    aioclient_mock.post(
+        f"https://{config_entry_setup.data[CONF_HOST]}:1234"
+        f"/api/s/{config_entry_setup.data[CONF_SITE_ID]}/cmd/devmgr",
+    )
+
+    await hass.services.async_call(
+        SWITCH_DOMAIN,
+        SERVICE_TURN_ON,
+        {ATTR_ENTITY_ID: entity_id},
+        blocking=True,
+    )
+    # Optimistic update should keep state on until device reports back
+    assert hass.states.get(entity_id).state == STATE_ON
+    assert aioclient_mock.call_count == 1
+    assert aioclient_mock.mock_calls[0][2] == {
+        "cmd": "set-locate",
+        "mac": device_payload[0]["mac"],
+    }
+
+    updated_device = deepcopy(device_payload[0])
+    mock_websocket_message(message=MessageKey.DEVICE, data=updated_device)
+    await hass.async_block_till_done()
+    assert hass.states.get(entity_id).state == STATE_ON
+
+    updated_device["locating"] = True
+    mock_websocket_message(message=MessageKey.DEVICE, data=updated_device)
+    await hass.async_block_till_done()
+    assert hass.states.get(entity_id).state == STATE_ON
+
+    aioclient_mock.clear_requests()
+    await hass.services.async_call(
+        SWITCH_DOMAIN,
+        SERVICE_TURN_OFF,
+        {ATTR_ENTITY_ID: entity_id},
+        blocking=True,
+    )
+    assert aioclient_mock.call_count == 1
+    assert aioclient_mock.mock_calls[0][2] == {
+        "cmd": "unset-locate",
+        "mac": device_payload[0]["mac"],
+    }
+
+    updated_device["locating"] = False
+    mock_websocket_message(message=MessageKey.DEVICE, data=updated_device)
+    await hass.async_block_till_done()
+    assert hass.states.get(entity_id).state == STATE_OFF
 
 
 @pytest.mark.parametrize(
@@ -1328,9 +1391,9 @@ async def test_firewall_policies(
 @pytest.mark.parametrize(
     ("device_payload", "entity_id", "outlet_index", "expected_switches"),
     [
-        ([OUTLET_UP1], "plug_outlet_1", 1, 1),
-        ([PDU_DEVICE_1], "dummy_usp_pdu_pro_usb_outlet_1", 1, 2),
-        ([PDU_DEVICE_1], "dummy_usp_pdu_pro_outlet_2", 2, 2),
+        ([OUTLET_UP1], "plug_outlet_1", 1, 2),
+        ([PDU_DEVICE_1], "dummy_usp_pdu_pro_usb_outlet_1", 1, 3),
+        ([PDU_DEVICE_1], "dummy_usp_pdu_pro_outlet_2", 2, 3),
     ],
 )
 async def test_outlet_switches(
@@ -1511,7 +1574,7 @@ async def test_poe_port_switches(
     device_payload: list[dict[str, Any]],
 ) -> None:
     """Test PoE port entities work."""
-    assert len(hass.states.async_entity_ids(SWITCH_DOMAIN)) == 0
+    assert len(hass.states.async_entity_ids(SWITCH_DOMAIN)) == 1
 
     ent_reg_entry = entity_registry.async_get("switch.mock_name_port_1_poe")
     assert ent_reg_entry.disabled_by == RegistryEntryDisabler.INTEGRATION
@@ -1763,7 +1826,8 @@ async def test_updating_unique_id(
 
     await config_entry_factory()
 
-    assert len(hass.states.async_entity_ids(SWITCH_DOMAIN)) == 2
+    assert len(hass.states.async_entity_ids(SWITCH_DOMAIN)) == 3
+    assert hass.states.get("switch.plug_locate")
     assert hass.states.get("switch.plug_outlet_1")
     assert hass.states.get("switch.switch_port_1_poe")
 
@@ -1785,29 +1849,31 @@ async def test_hub_state_change(
     hass: HomeAssistant, mock_websocket_state: WebsocketStateManager
 ) -> None:
     """Verify entities state reflect on hub connection becoming unavailable."""
-    entity_ids = (
-        "switch.block_client_2",
-        "switch.mock_name_port_1_poe",
-        "switch.mock_name_port_1",
-        "switch.plug_outlet_1",
-        "switch.block_media_streaming",
-        "switch.unifi_network_plex",
-        "switch.unifi_network_test_traffic_rule",
-        "switch.unifi_network_allow_internal_to_iot",
-        "switch.ssid_1",
-    )
-    for entity_id in entity_ids:
-        assert hass.states.get(entity_id).state == STATE_ON
+    expected_states = {
+        "switch.block_client_2": STATE_ON,
+        "switch.mock_name_locate": STATE_OFF,
+        "switch.mock_name_port_1_poe": STATE_ON,
+        "switch.mock_name_port_1": STATE_ON,
+        "switch.plug_locate": STATE_OFF,
+        "switch.plug_outlet_1": STATE_ON,
+        "switch.block_media_streaming": STATE_ON,
+        "switch.unifi_network_plex": STATE_ON,
+        "switch.unifi_network_test_traffic_rule": STATE_ON,
+        "switch.unifi_network_allow_internal_to_iot": STATE_ON,
+        "switch.ssid_1": STATE_ON,
+    }
+    for entity_id, expected_state in expected_states.items():
+        assert hass.states.get(entity_id).state == expected_state
 
     # Controller disconnects
     await mock_websocket_state.disconnect()
-    for entity_id in entity_ids:
+    for entity_id in expected_states:
         assert hass.states.get(entity_id).state == STATE_UNAVAILABLE
 
     # Controller reconnects
     await mock_websocket_state.reconnect()
-    for entity_id in entity_ids:
-        assert hass.states.get(entity_id).state == STATE_ON
+    for entity_id, expected_state in expected_states.items():
+        assert hass.states.get(entity_id).state == expected_state
 
 
 @pytest.mark.parametrize("device_payload", [[DEVICE_1]])
@@ -1821,7 +1887,7 @@ async def test_port_control_switches(
 ) -> None:
     """Test port control entities work."""
 
-    assert len(hass.states.async_entity_ids(SWITCH_DOMAIN)) == 0
+    assert len(hass.states.async_entity_ids(SWITCH_DOMAIN)) == 1
 
     ent_reg_entry = entity_registry.async_get("switch.mock_name_port_1")
     assert (

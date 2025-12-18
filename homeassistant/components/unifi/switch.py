@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 import aiounifi
 from aiounifi.interfaces.api_handlers import APIHandler, ItemEvent
 from aiounifi.interfaces.clients import Clients
+from aiounifi.interfaces.devices import Devices
 from aiounifi.interfaces.dpi_restriction_groups import DPIRestrictionGroups
 from aiounifi.interfaces.firewall_policies import FirewallPolicies
 from aiounifi.interfaces.outlets import Outlets
@@ -28,6 +29,8 @@ from aiounifi.interfaces.wlans import Wlans
 from aiounifi.models.api import ApiItem
 from aiounifi.models.client import Client, ClientBlockRequest
 from aiounifi.models.device import (
+    Device,
+    DeviceLocateRequest,
     DeviceSetOutletRelayRequest,
     DeviceSetPortEnabledRequest,
 )
@@ -69,6 +72,8 @@ from .hub import UnifiHub
 
 CLIENT_BLOCKED = (EventKey.WIRED_CLIENT_BLOCKED, EventKey.WIRELESS_CLIENT_BLOCKED)
 CLIENT_UNBLOCKED = (EventKey.WIRED_CLIENT_UNBLOCKED, EventKey.WIRELESS_CLIENT_UNBLOCKED)
+
+OPTIMISTIC_STATE_DURATION = 5.0
 
 
 @callback
@@ -227,6 +232,25 @@ async def async_wlan_control_fn(hub: UnifiHub, obj_id: str, target: bool) -> Non
     await hub.api.request(WlanEnableRequest.create(obj_id, target))
 
 
+@callback
+def async_device_locate_supported_fn(hub: UnifiHub, obj_id: str) -> bool:
+    """Determine if a device supports locate control."""
+    return hub.api.devices[obj_id].supports_locating
+
+
+@callback
+def async_device_locating_is_on_fn(hub: UnifiHub, device: Device) -> bool:
+    """Return locate state for a device."""
+    return bool(device.locating)
+
+
+async def async_device_locate_control_fn(
+    hub: UnifiHub, obj_id: str, target: bool
+) -> None:
+    """Control device locate mode."""
+    await hub.api.request(DeviceLocateRequest.create(obj_id, target))
+
+
 @dataclass(frozen=True, kw_only=True)
 class UnifiSwitchEntityDescription[HandlerT: APIHandler, ApiItemT: ApiItem](
     SwitchEntityDescription, UnifiEntityDescription[HandlerT, ApiItemT]
@@ -241,6 +265,8 @@ class UnifiSwitchEntityDescription[HandlerT: APIHandler, ApiItemT: ApiItem](
     """Callback for additional subscriptions to any UniFi handler."""
     only_event_for_state_change: bool = False
     """Use only UniFi events to trigger state changes."""
+    optimistic_update: bool = False
+    """Optimistically update state after control action."""
 
 
 ENTITY_DESCRIPTIONS: tuple[UnifiSwitchEntityDescription, ...] = (
@@ -289,6 +315,22 @@ ENTITY_DESCRIPTIONS: tuple[UnifiSwitchEntityDescription, ...] = (
         object_fn=lambda api, obj_id: api.firewall_policies[obj_id],
         unique_id_fn=lambda hub, obj_id: f"firewall_policy-{obj_id}",
         supported_fn=async_firewall_policy_supported_fn,
+    ),
+    UnifiSwitchEntityDescription[Devices, Device](
+        key="Device locate",
+        translation_key="device_locate",
+        device_class=SwitchDeviceClass.SWITCH,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        api_handler_fn=lambda api: api.devices,
+        available_fn=async_device_available_fn,
+        control_fn=async_device_locate_control_fn,
+        device_info_fn=async_device_device_info_fn,
+        is_on_fn=async_device_locating_is_on_fn,
+        name_fn=lambda device: "Locate",
+        object_fn=lambda api, obj_id: api.devices[obj_id],
+        supported_fn=async_device_locate_supported_fn,
+        unique_id_fn=lambda hub, obj_id: f"locate-{obj_id}",
+        optimistic_update=True,
     ),
     UnifiSwitchEntityDescription[Outlets, Outlet](
         key="Outlet control",
@@ -438,6 +480,19 @@ class UnifiSwitchEntity[HandlerT: APIHandler, ApiItemT: ApiItem](
     """Base representation of a UniFi switch."""
 
     entity_description: UnifiSwitchEntityDescription[HandlerT, ApiItemT]
+    _pending_state: bool | None
+    _pending_state_until: float
+
+    def __init__(
+        self,
+        obj_id: str,
+        hub: UnifiHub,
+        description: UnifiSwitchEntityDescription[HandlerT, ApiItemT],
+    ) -> None:
+        """Initialize the UniFi switch."""
+        self._pending_state = None
+        self._pending_state_until = 0.0
+        super().__init__(obj_id, hub, description)
 
     @callback
     def async_initiate_state(self) -> None:
@@ -447,10 +502,24 @@ class UnifiSwitchEntity[HandlerT: APIHandler, ApiItemT: ApiItem](
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on switch."""
         await self.entity_description.control_fn(self.hub, self._obj_id, True)
+        if self.entity_description.optimistic_update:
+            self._pending_state = True
+            self._pending_state_until = (
+                self.hass.loop.time() + OPTIMISTIC_STATE_DURATION
+            )
+            self._attr_is_on = True
+            self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off switch."""
         await self.entity_description.control_fn(self.hub, self._obj_id, False)
+        if self.entity_description.optimistic_update:
+            self._pending_state = False
+            self._pending_state_until = (
+                self.hass.loop.time() + OPTIMISTIC_STATE_DURATION
+            )
+            self._attr_is_on = False
+            self.async_write_ha_state()
 
     @callback
     def async_update_state(
@@ -465,7 +534,17 @@ class UnifiSwitchEntity[HandlerT: APIHandler, ApiItemT: ApiItem](
 
         description = self.entity_description
         obj = description.object_fn(self.api, self._obj_id)
-        if (is_on := description.is_on_fn(self.hub, obj)) != self.is_on:
+        is_on = description.is_on_fn(self.hub, obj)
+
+        if description.optimistic_update and self._pending_state is not None:
+            if is_on == self._pending_state:
+                self._pending_state = None
+            elif self.hass.loop.time() < self._pending_state_until:
+                return
+            else:
+                self._pending_state = None
+
+        if is_on != self.is_on:
             self._attr_is_on = is_on
 
     @callback
@@ -481,6 +560,12 @@ class UnifiSwitchEntity[HandlerT: APIHandler, ApiItemT: ApiItem](
 
         if event.key in description.event_to_subscribe:
             self._attr_is_on = event.key in description.event_is_on
+            if (
+                description.optimistic_update
+                and self._pending_state is not None
+                and self._attr_is_on == self._pending_state
+            ):
+                self._pending_state = None
         self._attr_available = description.available_fn(self.hub, self._obj_id)
         self.async_write_ha_state()
 

@@ -39,6 +39,11 @@
         "name": "LED"
       }
     },
+    "switch": {
+      "device_locate": {
+        "name": "Locate"
+      }
+    },
     "sensor": {
       "device_state": {
         "state": {

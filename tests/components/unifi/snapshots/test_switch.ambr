@@ -96,6 +96,55 @@
     'state': 'on',
   })
 # ---
+# name: test_entity_and_device_data[site_payload0-wlan_payload0-traffic_rule_payload0-port_forward_payload0-dpi_group_payload0-dpi_app_payload0-device_payload0-client_payload0-config_entry_options0][switch.dummy_usp_pdu_pro_locate-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': set({
+    }),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'switch',
+    'entity_category': <EntityCategory.DIAGNOSTIC: 'diagnostic'>,
+    'entity_id': 'switch.dummy_usp_pdu_pro_locate',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'options': dict({
+    }),
+    'original_device_class': <SwitchDeviceClass.SWITCH: 'switch'>,
+    'original_icon': None,
+    'original_name': 'Locate',
+    'platform': 'unifi',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'device_locate',
+    'unique_id': 'locate-01:02:03:04:05:ff',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entity_and_device_data[site_payload0-wlan_payload0-traffic_rule_payload0-port_forward_payload0-dpi_group_payload0-dpi_app_payload0-device_payload0-client_payload0-config_entry_options0][switch.dummy_usp_pdu_pro_locate-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'device_class': 'switch',
+      'friendly_name': 'Dummy USP-PDU-Pro Locate',
+    }),
+    'context': <ANY>,
+    'entity_id': 'switch.dummy_usp_pdu_pro_locate',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'off',
+  })
+# ---
 # name: test_entity_and_device_data[site_payload0-wlan_payload0-traffic_rule_payload0-port_forward_payload0-dpi_group_payload0-dpi_app_payload0-device_payload0-client_payload0-config_entry_options0][switch.dummy_usp_pdu_pro_outlet_2-entry]
   EntityRegistryEntrySnapshot({
     'aliases': set({
@@ -192,6 +241,55 @@
     'last_reported': <ANY>,
     'last_updated': <ANY>,
     'state': 'on',
+  })
+# ---
+# name: test_entity_and_device_data[site_payload0-wlan_payload0-traffic_rule_payload0-port_forward_payload0-dpi_group_payload0-dpi_app_payload0-device_payload0-client_payload0-config_entry_options0][switch.mock_name_locate-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': set({
+    }),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'switch',
+    'entity_category': <EntityCategory.DIAGNOSTIC: 'diagnostic'>,
+    'entity_id': 'switch.mock_name_locate',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'options': dict({
+    }),
+    'original_device_class': <SwitchDeviceClass.SWITCH: 'switch'>,
+    'original_icon': None,
+    'original_name': 'Locate',
+    'platform': 'unifi',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'device_locate',
+    'unique_id': 'locate-10:00:00:00:01:01',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entity_and_device_data[site_payload0-wlan_payload0-traffic_rule_payload0-port_forward_payload0-dpi_group_payload0-dpi_app_payload0-device_payload0-client_payload0-config_entry_options0][switch.mock_name_locate-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'device_class': 'switch',
+      'friendly_name': 'mock-name Locate',
+    }),
+    'context': <ANY>,
+    'entity_id': 'switch.mock_name_locate',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'off',
   })
 # ---
 # name: test_entity_and_device_data[site_payload0-wlan_payload0-traffic_rule_payload0-port_forward_payload0-dpi_group_payload0-dpi_app_payload0-device_payload0-client_payload0-config_entry_options0][switch.mock_name_port_1-entry]
@@ -535,6 +633,55 @@
     'last_reported': <ANY>,
     'last_updated': <ANY>,
     'state': 'on',
+  })
+# ---
+# name: test_entity_and_device_data[site_payload0-wlan_payload0-traffic_rule_payload0-port_forward_payload0-dpi_group_payload0-dpi_app_payload0-device_payload0-client_payload0-config_entry_options0][switch.plug_locate-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': set({
+    }),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'switch',
+    'entity_category': <EntityCategory.DIAGNOSTIC: 'diagnostic'>,
+    'entity_id': 'switch.plug_locate',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'options': dict({
+    }),
+    'original_device_class': <SwitchDeviceClass.SWITCH: 'switch'>,
+    'original_icon': None,
+    'original_name': 'Locate',
+    'platform': 'unifi',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'device_locate',
+    'unique_id': 'locate-fc:ec:da:76:4f:5f',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entity_and_device_data[site_payload0-wlan_payload0-traffic_rule_payload0-port_forward_payload0-dpi_group_payload0-dpi_app_payload0-device_payload0-client_payload0-config_entry_options0][switch.plug_locate-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'device_class': 'switch',
+      'friendly_name': 'Plug Locate',
+    }),
+    'context': <ANY>,
+    'entity_id': 'switch.plug_locate',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'off',
   })
 # ---
 # name: test_entity_and_device_data[site_payload0-wlan_payload0-traffic_rule_payload0-port_forward_payload0-dpi_group_payload0-dpi_app_payload0-device_payload0-client_payload0-config_entry_options0][switch.plug_outlet_1-entry]
